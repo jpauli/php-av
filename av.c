@@ -191,7 +191,7 @@ PHP_FUNCTION(av_file_close)
 
 	ZEND_FETCH_RESOURCE(av_file, void *, &res, -1, AVFILE_RESOURCE_NAME, le_avfile_resource);
 
-	avformat_free_context(av_file);
+	zend_list_delete(Z_RESVAL_P(res));
 }
 
 
