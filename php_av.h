@@ -21,8 +21,48 @@
 #ifndef PHP_AV_H
 #define PHP_AV_H
 
-#include <libavutil/dict.h>
 #include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+
+#define LIBAV_ERROR_BUF_LEN 255
+
+#define AVFILE_RESOURCE_NAME    "avfile_resource"
+
+#define AVSTREAM_RESOURCE_NAME "avstream_resource"
+
+#define AV_LAST_ERROR_TO_PHP do { \
+	if (php_av_last_error) { \
+		php_error(E_WARNING, "libav error : %.*s", LIBAV_ERROR_BUF_LEN, php_av_last_error); \
+	} \
+} while(0);
+
+#define AV_SET_LAST_ERROR(averror_num) av_strerror(averror_num, php_av_last_error, LIBAV_ERROR_BUF_LEN);
+
+
+static int le_avfile_resource;
+static int le_avstream_resource;
+static char php_av_last_error[LIBAV_ERROR_BUF_LEN] = {0};
+
+
+typedef struct {
+	AVFormatContext *av_file;
+	zend_bool is_user_opened;
+	zend_uint user_opened_streams;
+} php_av_file;
+
+typedef struct {
+	AVStream *stream;
+	php_av_file *php_av_file;
+} php_av_stream;
+
+
+static php_av_file *php_av_file_open(char *);
+static php_av_stream *php_av_stream_open_from_file(php_av_file *, uint);
+static void php_av_stream_close(php_av_stream *);
+static void php_av_file_close(php_av_file *);
+static void _php_av_file_dtor(php_av_file *);
+static void _resource_close(INTERNAL_FUNCTION_PARAMETERS);
+static const char *_php_av_get_stream_type(php_av_stream *);
 
 extern zend_module_entry av_module_entry;
 #define phpext_av_ptr &av_module_entry

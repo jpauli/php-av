@@ -41,6 +41,44 @@ string(22) "GPL version 2 or later"
 }
 */
 
+$stream_one = av_stream_open($r, 0);
+var_dump(av_stream_get_metadata($stream_one));
+/*
+array(5) {
+  ["type"]=>
+  string(5) "video"
+  ["codec"]=>
+  string(13) "MPEG-4 part 2"
+  ["duration"]=>
+  int(5665)
+  ["width"]=>
+  int(400)
+  ["height"]=>
+  int(300)
+}
+*/
+
+$stream_two = av_stream_open($r, 1);
+var_dump(av_stream_get_metadata($stream_two));
+/*
+array(6) {
+  ["type"]=>
+  string(5) "audio"
+  ["codec"]=>
+  string(24) "MP3 (MPEG audio layer 3)"
+  ["duration"]=>
+  int(-9223372036854775808)
+  ["audio_channels"]=>
+  int(2)
+  ["sample_rate"]=>
+  int(44100)
+  ["bit_rate"]=>
+  int(111784)
+}
+*/
+
+av_stream_close($stream_one);
+av_stream_close($stream_two);
 av_file_close($r);
 ```
 
