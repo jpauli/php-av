@@ -182,9 +182,9 @@ static void _php_av_file_dtor(php_av_file *php_av_file)
 
 static const char *_php_av_get_stream_type(php_av_stream *pas)
 {
-#if LIBAVUTIL_BUILD >= AV_VERSION_INT(51, 13, 0)
-	return av_get_media_type_string(pas->stream->codec->codec_type);
-#else
+	// added in 51.13.0
+	//return av_get_media_type_string(pas->stream->codec->codec_type);
+
 	switch (pas->stream->codec->codec_type) {
 	case AVMEDIA_TYPE_AUDIO:
 		return "audio";
@@ -195,7 +195,6 @@ static const char *_php_av_get_stream_type(php_av_stream *pas)
 	}
 
 	return "unknown";
-#endif
 }
 
 static int _php_av_find_video_stream(AVFormatContext* ctx, AVStream** stream, AVCodecContext** codec_ctx, AVCodec** codec)
@@ -302,7 +301,10 @@ static int _php_av_write_jpeg(php_stream* ostream, AVCodecContext* video_codec_c
 	encoder_codec_ctx->pix_fmt = AV_PIX_FMT_YUVJ420P;
 
 	if (avcodec_open2(encoder_codec_ctx, encoder_codec, NULL) < 0) {
-		avcodec_free_context(&encoder_codec_ctx);
+		// added in 55.52.0
+		//avcodec_free_context(&encoder_codec_ctx);
+		avcodec_close(encoder_codec_ctx);
+		av_free(encoder_codec_ctx);
 		av_free(encoder_output_buffer);
 		av_free(dst_buffer);
 		av_free(dst_frame);
