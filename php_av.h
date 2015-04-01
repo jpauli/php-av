@@ -47,6 +47,9 @@
 #define AV_ECODEC 2
 #define AV_ESEEK 3
 #define AV_EDECODE 4
+#define AV_ENCODE 5
+#define AV_EALLOC 6
+#define AV_EFILE 7
 
 static int le_avfile_resource;
 static int le_avstream_resource;
