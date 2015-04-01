@@ -49,7 +49,10 @@ if test "$PHP_AV" != "no"; then
 
    PHP_CHECK_LIBRARY($LIBNAME, $LIBSYMBOL,
    [
-     PHP_ADD_LIBRARY_WITH_PATH($LIBNAME, $AV_DIR/lib, AV_SHARED_LIBADD)
+     PHP_ADD_LIBRARY_WITH_PATH(avformat, $AV_DIR/lib, AV_SHARED_LIBADD)
+     PHP_ADD_LIBRARY_WITH_PATH(avutil, $AV_DIR/lib, AV_SHARED_LIBADD)
+     PHP_ADD_LIBRARY_WITH_PATH(avcodec, $AV_DIR/lib, AV_SHARED_LIBADD)
+     PHP_ADD_LIBRARY_WITH_PATH(swscale, $AV_DIR/lib, AV_SHARED_LIBADD)
      AC_DEFINE(HAVE_AVLIB,1,[ ])
    ],[
      AC_MSG_ERROR([wrong av lib version or lib not found])
