@@ -129,7 +129,7 @@ static php_av_file *php_av_file_open(char *filename)
 	php_av_file *file = NULL;
 	int ret = 0;
 
-	if (ret = avformat_open_input(&av_ctx, filename, NULL, NULL)) {
+	if ((ret = avformat_open_input(&av_ctx, filename, NULL, NULL))) {
 		AV_SET_LAST_ERROR(ret);
 		return NULL;
 	}
@@ -216,27 +216,10 @@ static int _php_av_find_video_stream(AVFormatContext* ctx, AVStream** stream, AV
 	return -1;
 }
 
-static size_t create_thumbnail (AVCodecContext *pCodecCtx, int src_width, int src_height,
-	int src_stride[],
-	enum PixelFormat src_pixfmt,
-	const uint8_t * const src_data[],
-	int dst_width, int dst_height,
-	uint8_t **output_data,
-	size_t output_max_size,
-	size_t* output_actual)
+static int _php_av_write_jpeg(php_stream* ostream, AVCodecContext* video_codec_ctx, AVFrame* frame)
 {
-	AVCodecContext *encoder_codec_ctx;
-	AVDictionary *opts;
-	AVCodec *encoder_codec;
-	struct SwsContext *scaler_ctx;
-	AVFrame *dst_frame;
-	uint8_t *dst_buffer;
-	uint8_t *encoder_output_buffer;
-	size_t encoder_output_buffer_size;
-	int err;
-
 	enum AVPixelFormat pix_fmt;
-	switch (src_pixfmt) {
+	switch (video_codec_ctx->pix_fmt) {
 		case AV_PIX_FMT_YUVJ420P:
 			pix_fmt = AV_PIX_FMT_YUV420P;
 			break;
@@ -250,82 +233,78 @@ static size_t create_thumbnail (AVCodecContext *pCodecCtx, int src_width, int sr
 			pix_fmt = AV_PIX_FMT_YUV440P;
 			break;
 		default:
-			pix_fmt = src_pixfmt;
+			pix_fmt = video_codec_ctx->pix_fmt;
 			break;
 	}
 
-	AVPacket pkt;
-	av_init_packet(&pkt);
-	pkt.data = NULL;
-	pkt.size = 0;
-	int gotPacket;
-
-	if (NULL == (encoder_codec = avcodec_find_encoder ( AV_CODEC_ID_MJPEG ))) {
+	AVCodec *encoder_codec = avcodec_find_encoder(AV_CODEC_ID_MJPEG);
+	if (NULL == encoder_codec) {
 		return AV_ERROR;
 	}
 
- 
-	scaler_ctx = sws_getContext (src_width, src_height, src_pixfmt, dst_width, dst_height,
+	struct SwsContext* scaler_ctx = sws_getContext(video_codec_ctx->width, video_codec_ctx->height, 
+		video_codec_ctx->pix_fmt, 
+		video_codec_ctx->width, video_codec_ctx->height,
 		pix_fmt, SWS_BILINEAR, NULL, NULL, NULL);
 
 	if (NULL == scaler_ctx) {
 		return AV_ERROR;
 	}
 
-	dst_frame = av_frame_alloc();
+	AVFrame* dst_frame = av_frame_alloc();
 	if (NULL == dst_frame) {
-		sws_freeContext (scaler_ctx);
+		sws_freeContext(scaler_ctx);
 		return AV_ERROR;
 	}
 
-	dst_buffer = av_malloc(avpicture_get_size(pix_fmt, dst_width, dst_height));
+	uint8_t* dst_buffer;
+	dst_buffer = av_malloc(avpicture_get_size(pix_fmt, video_codec_ctx->width, video_codec_ctx->height));
 
 	if (NULL == dst_buffer) {
-		av_free (dst_frame);
-		sws_freeContext (scaler_ctx);
+		av_free(dst_frame);
+		sws_freeContext(scaler_ctx);
 		return AV_ERROR;
 	}
 
-	avpicture_fill((AVPicture *) dst_frame, dst_buffer, pix_fmt, dst_width, dst_height);
-	sws_scale (scaler_ctx, src_data, src_stride, 0, src_height, 
+	avpicture_fill((AVPicture *) dst_frame, dst_buffer, pix_fmt, video_codec_ctx->width, video_codec_ctx->height);
+	sws_scale(scaler_ctx, (const uint8_t *const *)frame->data, frame->linesize, 0, video_codec_ctx->height, 
 	dst_frame->data, dst_frame->linesize);
 
-	encoder_output_buffer_size = output_max_size;
-	encoder_output_buffer = av_malloc (encoder_output_buffer_size);
+	uint8_t* encoder_output_buffer = av_malloc(MAX_THUMB_BYTES);
 
 	if (NULL == encoder_output_buffer) {
-		av_free (dst_buffer);
-		av_free (dst_frame);
-		sws_freeContext (scaler_ctx);
+		av_free(dst_buffer);
+		av_free(dst_frame);
+		sws_freeContext(scaler_ctx);
 		return AV_ERROR;
 	}
 
+	AVCodecContext *encoder_codec_ctx;
 	encoder_codec_ctx = avcodec_alloc_context3(encoder_codec);
 
 	if (NULL == encoder_codec_ctx) {
-		av_free (encoder_output_buffer);
-		av_free (dst_buffer);
-		av_free (dst_frame);
-		sws_freeContext (scaler_ctx);
+		av_free(encoder_output_buffer);
+		av_free(dst_buffer);
+		av_free(dst_frame);
+		sws_freeContext(scaler_ctx);
 		return AV_ERROR;
 	}
 
-	encoder_codec_ctx->width = dst_width;
-	encoder_codec_ctx->height = dst_height;
-	encoder_codec_ctx->bit_rate = pCodecCtx->bit_rate;
+	encoder_codec_ctx->width = video_codec_ctx->width;
+	encoder_codec_ctx->height = video_codec_ctx->height;
+	encoder_codec_ctx->bit_rate = video_codec_ctx->bit_rate;
 	encoder_codec_ctx->codec_id = AV_CODEC_ID_MJPEG;
 	encoder_codec_ctx->codec_type = AVMEDIA_TYPE_VIDEO;
-	encoder_codec_ctx->time_base.num = pCodecCtx->time_base.num;
-	encoder_codec_ctx->time_base.den = pCodecCtx->time_base.den;
+	encoder_codec_ctx->time_base.num = video_codec_ctx->time_base.num;
+	encoder_codec_ctx->time_base.den = video_codec_ctx->time_base.den;
 	encoder_codec_ctx->pix_fmt = AV_PIX_FMT_YUVJ420P;
 
-	opts = NULL;
-	if (avcodec_open2(encoder_codec_ctx, encoder_codec, &opts) < 0) {
-		av_free (encoder_codec_ctx);
-		av_free (encoder_output_buffer);
-		av_free (dst_buffer);
-		av_free (dst_frame);
-		sws_freeContext  (scaler_ctx);
+	if (avcodec_open2(encoder_codec_ctx, encoder_codec, NULL) < 0) {
+		avcodec_free_context(&encoder_codec_ctx);
+		av_free(encoder_output_buffer);
+		av_free(dst_buffer);
+		av_free(dst_frame);
+		sws_freeContext(scaler_ctx);
 		return AV_ERROR;
 	}
 
@@ -337,42 +316,26 @@ static size_t create_thumbnail (AVCodecContext *pCodecCtx, int src_width, int sr
 	dst_frame->pts = 1;
 	dst_frame->quality = encoder_codec_ctx->global_quality;
 
-	err = avcodec_encode_video2(encoder_codec_ctx, &pkt, dst_frame, &gotPacket);
+	AVPacket pkt;
+	av_init_packet(&pkt);
+	pkt.data = NULL;
+	pkt.size = 0;
 
-	if (err >= 0) {
-		(*output_actual) = pkt.size;
-		memcpy(encoder_output_buffer,pkt.data, pkt.size);
+	int gotPacket;
+	
+	int res = avcodec_encode_video2(encoder_codec_ctx, &pkt, dst_frame, &gotPacket);
+	if (res >= 0) {
+		php_stream_write(ostream, (const char*)pkt.data, pkt.size);
 		av_free_packet(&pkt);
 	}
 
-	av_dict_free(&opts);
 	avcodec_close(encoder_codec_ctx);
 	av_free(encoder_codec_ctx);
 	av_free(dst_buffer);
 	av_free(dst_frame);
 	sws_freeContext(scaler_ctx);
-	*output_data = encoder_output_buffer;
 
-	return err;
-}
-
-static int _php_av_write_jpeg(php_stream* ostream, AVCodecContext* video_codec_ctx, AVFrame* frame)
-{
-	size_t output_size;
-	uint8_t* encoded_thumbnail = NULL;
-
-	int res = create_thumbnail(video_codec_ctx, video_codec_ctx->width, video_codec_ctx->height,
-		frame->linesize, video_codec_ctx->pix_fmt,
-		(const uint8_t* const *) frame->data,
-		video_codec_ctx->width, video_codec_ctx->height,
-		&encoded_thumbnail, MAX_THUMB_BYTES, &output_size);
-
-	if (res == AV_EOK) {
-		php_stream_write(ostream, encoded_thumbnail, output_size);
-		av_free(encoded_thumbnail);
-	}
-
-	return res;
+	return AV_EOK;
 }
 
 PHP_MINIT_FUNCTION(av)
@@ -593,7 +556,7 @@ PHP_FUNCTION(av_stream_open)
 	pas = php_av_stream_open_from_file(paf, stream_no);
 
 	if (!pas) {
-		php_error(E_WARNING, "Unknown stream number %d", stream_no);
+		php_error(E_WARNING, "Unknown stream number %ld", stream_no);
 		return;
 	}
 
