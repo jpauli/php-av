@@ -182,9 +182,10 @@ static void _php_av_file_dtor(php_av_file *php_av_file)
 
 static const char *_php_av_get_stream_type(php_av_stream *pas)
 {
+#if LIBAVUTIL_BUILD >= AV_VERSION_INT(51, 13, 0)
 	return av_get_media_type_string(pas->stream->codec->codec_type);
-
-	/*switch (pas->stream->codec->codec_type) {
+#else
+	switch (pas->stream->codec->codec_type) {
 	case AVMEDIA_TYPE_AUDIO:
 		return "audio";
 	case AVMEDIA_TYPE_VIDEO:
@@ -193,7 +194,8 @@ static const char *_php_av_get_stream_type(php_av_stream *pas)
 		return "subtitle";
 	}
 
-	return "unknown";*/
+	return "unknown";
+#endif
 }
 
 static int _php_av_find_video_stream(AVFormatContext* ctx, AVStream** stream, AVCodecContext** codec_ctx, AVCodec** codec)
