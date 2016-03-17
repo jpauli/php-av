@@ -82,6 +82,46 @@ av_stream_close($stream_two);
 av_file_close($r);
 ```
 
+## Exporting a frame to JPEG
+
+```php
+function handle_averror($e)
+{
+    switch ($e) {
+        case AV_EVIDEO:
+            return 'Media file does not have a video stream.';
+        case AV_ECODEC:
+            return 'Failed to open codec for encoding/decoding.';
+        case AV_EALLOC:
+            return 'Failed to allocate memory.';
+        case AV_ESEEK:
+            return 'Failed to seek to the given timestamp.';
+        case AV_EDECODE:
+            return 'Failed to decode a complete frame.';
+        case AV_ENCODE:
+            return 'Failed to encode frame to JPEG.';
+        case AV_EFILE:
+            return 'Failed to open output file.';
+        case AV_ERROR:
+            return 'Unknown error.';
+    }
+
+    /* success, do nothing */
+}
+
+$file = '/tmp/video.mp4';
+
+$r = av_file_open($file);
+// extract frame at 5 seconds
+$result = av_frame_to_jpeg($r, 'thumb.jpg', 5.0);
+
+if ($result !== AV_EOK) {
+    handle_averror($result);
+}
+
+av_file_close($r);
+```
+
 Wip
 ===
 

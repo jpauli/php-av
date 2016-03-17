@@ -23,6 +23,7 @@
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libswscale/swscale.h>
 
 #define LIBAV_ERROR_BUF_LEN 255
 
@@ -38,6 +39,17 @@
 
 #define AV_SET_LAST_ERROR(averror_num) av_strerror(averror_num, php_av_last_error, LIBAV_ERROR_BUF_LEN);
 
+#define MAX_THUMB_BYTES (100*1024)
+
+#define AV_ERROR -1
+#define AV_EOK 0
+#define AV_EVIDEO 1
+#define AV_ECODEC 2
+#define AV_ESEEK 3
+#define AV_EDECODE 4
+#define AV_ENCODE 5
+#define AV_EALLOC 6
+#define AV_EFILE 7
 
 static int le_avfile_resource;
 static int le_avstream_resource;
@@ -91,6 +103,7 @@ PHP_FUNCTION(av_file_open);
 //PHP_FUNCTION(av_open_fd);
 PHP_FUNCTION(av_file_close);
 PHP_FUNCTION(av_file_get_metadata);
+PHP_FUNCTION(av_frame_to_jpeg);
 PHP_FUNCTION(av_stream_open);
 PHP_FUNCTION(av_stream_close);
 PHP_FUNCTION(av_stream_get_metadata);
